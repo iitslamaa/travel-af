@@ -1,4 +1,4 @@
-# ✈️ Travel AF — Travelability Scoring App
+# TravelScorer — Travelability Scoring App
 
 **Status:** Work in Progress (Public Portfolio Project)
 
@@ -11,9 +11,9 @@ Built as a **TypeScript monorepo** with:
 
 ---
 
-## 🌍 Overview
+## Overview
 
-Travel AF aggregates and normalizes open global data sources:
+TravelScorer aggregates and normalizes open global data sources:
 
 | Data Source | Purpose |
 |--------------|----------|
@@ -39,7 +39,7 @@ Each country receives a **Travelability Score (0–100)** based on weighted fact
 
 ---
 
-## 🧱 Tech Stack
+## Tech Stack
 
 | Layer | Tech |
 |-------|------|
@@ -51,4 +51,43 @@ Each country receives a **Travelability Score (0–100)** based on weighted fact
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
+
+travel-af/
+├─ apps/
+│  └─ web/                     # Next.js app (website)
+│     ├─ app/                  # Next.js App Router (pages, API routes)
+│     │  └─ api/
+│     │     ├─ advisories/route.ts   # Fetch & normalize travel.state.gov advisories
+│     │     └─ countries/route.ts    # Join UN/ISO seeds + advisories into one response
+│     ├─ lib/                  # Country matching, facts joiners, types
+│     ├─ data/                 # UN/ISO seed data + small public datasets
+│     └─ scripts/
+│        └─ generate-seeds.mjs # Seed generator (idempotent)
+├─ packages/
+│  └─ shared/                  # Reusable TypeScript library (scoring/types)
+│     ├─ src/                  # source (score.ts, types.ts, index.ts)
+│     └─ dist/                 # build output (published to the workspace only)
+└─ package.json                # npm workspaces (monorepo)
+
+## Running Locally
+
+**Requirements**
+- Node 18+ (or 20+ recommended)
+- npm 9+ (uses **npm workspaces**)
+
+### 1) Clone & install
+```bash
+git clone https://github.com/iitslamaa/travel-af.git
+cd travel-af
+npm install
+
+### 2) Build the Shared Library
+# from the repo root
+npm run build -w @travel-af/shared
+# (or) cd packages/shared && npm run build
+
+### 3) Start the web app (Next.js)
+# from the repo root
+npm run dev -w apps/web
+# open http://localhost:3000
