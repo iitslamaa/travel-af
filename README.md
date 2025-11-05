@@ -85,7 +85,7 @@ travel-af/
 git clone https://github.com/iitslamaa/travel-af.git
 cd travel-af
 npm install
-
+```
 ### 2) Build the Shared Library
 # from the repo root
 npm run build -w @travel-af/shared
