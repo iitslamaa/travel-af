@@ -18,8 +18,11 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@travel-af/shared": ["../../packages/shared/src/index.ts"],
+      "@travel-af/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": [
