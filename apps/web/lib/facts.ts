@@ -1,6 +1,13 @@
 import path from 'path';
 import { promises as fs } from 'fs';
-import { Advisory } from '@/app/api/advisories/route';
+
+// Minimal shape used from advisories; duplicated locally to avoid cross-importing route code
+export type Advisory = {
+  iso2?: string;
+  level?: 1 | 2 | 3 | 4;
+  summary?: string;
+  url?: string;
+};
 
 // Numeric visa score expected by the scorer (0..100)
 // We keep the original categorical value only internally for mapping.
