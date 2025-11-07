@@ -13,6 +13,7 @@ import { buildVisaIndex } from '@/lib/providers/visa';
 import { estimateDailySpendHotel } from '@/lib/providers/costs';
 import type { DailySpend } from '@/lib/providers/costs';
 
+
 // Local type to avoid any
 type FactsExtraServer = Partial<CountryFacts> & {
   advisoryLevel?: 1 | 2 | 3 | 4;
@@ -60,6 +61,34 @@ const W_WEIGHTS = {
   directFlight: 0.05,
   infrastructure: 0.05,
 } as const;
+
+// --- Name normalization & alias index (to recover missing iso2 from names) ---
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/\s*\(.*?\)\s*/g, ' ')                  // drop parentheticals
+    .replace(/[^a-z0-9]+/g, ' ')                     // collapse punctuation
+    .trim()
+    .replace(/\s+/g, ' ');                           // collapse spaces
+}
+
+// Build a lookup from normalized official names and aliases → ISO2
+const NAME_INDEX: Map<string, string> = (() => {
+  const m = new Map<string, string>();
+  for (const seed of COUNTRY_SEEDS) {
+    const push = (label?: string) => {
+      if (!label) return;
+      const key = normalizeName(label);
+      if (key && !m.has(key)) m.set(key, seed.iso2.toUpperCase());
+    };
+    push(seed.name);
+    if (Array.isArray(seed.aliases)) {
+      for (const a of seed.aliases) push(a);
+    }
+  }
+  return m;
+})();
 
 // --- Frequent Miler helpers -------------------------------------------------
 function clusterConsecutiveMonths(months: number[]): number[][] {
@@ -152,11 +181,11 @@ async function safeJsonImport<T = Record<string, unknown>>(path: string): Promis
 
 type Advisory = {
   iso2?: string;
-  country: string;
+  country?: string;
   level: 1 | 2 | 3 | 4;
-  updatedAt: string;
-  url: string;
-  summary: string; // required for easier typing downstream
+  updatedAt?: string;  // normalized
+  url?: string;
+  summary?: string;
 };
 
 type CountryOut = CountrySeed & {
@@ -164,48 +193,83 @@ type CountryOut = CountrySeed & {
   facts?: CountryFacts;
 };
 
-export const revalidate = 21600;
-
 export async function GET() {
   // Build absolute base to call our other route reliably in dev/prod
   const h = await headers();
-  const proto = h.get('x-forwarded-proto') ?? 'http';
-  const host = h.get('host') ?? 'localhost:3000';
-  const base = `${proto}://${host}`;
+  const vercel = h.get('x-vercel-deployment-url'); // e.g. myapp-abc123.vercel.app
+  const host = vercel ?? h.get('x-forwarded-host') ?? h.get('host') ?? '';
+  const envBase = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, '');
+  const proto = vercel ? 'https' : (h.get('x-forwarded-proto') ?? (host.includes('localhost') ? 'http' : 'https'));
+  const base = envBase || (host ? `${proto}://${host}` : '');
 
   let advisories: Advisory[] = [];
   try {
-    const advRes = await fetch(`${base}/api/advisories`, { cache: 'no-store' });
+    const advUrl = base ? `${base}/api/advisories` : '/api/advisories';
+    const advRes = await fetch(advUrl, { cache: 'no-store' });
     const rawUnknown = advRes.ok ? ((await advRes.json()) as unknown) : null;
-    const raw = Array.isArray(rawUnknown)
-      ? (rawUnknown as Array<Record<string, unknown>>)
-      : [];
+    if (!advRes.ok || !Array.isArray(rawUnknown)) {
+      console.error('[countries] advisories upstream bad', { status: advRes.status, url: advUrl });
+    }
+
+    type AdvRaw = Partial<{
+      iso2: string;
+      country: string;
+      level: number | string;
+      updatedAt: string;
+      updated: string;
+      url: string;
+      summary: string;
+    }>;
+
+    const getStr = (v: unknown): string | undefined =>
+      typeof v === 'string' ? v : undefined;
+
+    const raw: AdvRaw[] = Array.isArray(rawUnknown) ? (rawUnknown as AdvRaw[]) : [];
 
     advisories = raw.map((r) => {
-      const levelNum = Number(r.level ?? 0);
-      const level = (levelNum === 1 || levelNum === 2 || levelNum === 3 || levelNum === 4)
-        ? levelNum
-        : 2; // sensible default
+      const lvl = Number(r.level ?? 0);
+      const level: 1 | 2 | 3 | 4 =
+        (lvl === 1 || lvl === 2 || lvl === 3 || lvl === 4) ? (lvl as 1 | 2 | 3 | 4) : 2;
 
       return {
-        iso2: typeof r.iso2 === 'string' ? r.iso2 : undefined,
-        country: typeof r.country === 'string' ? r.country : '',
-        level: level as 1 | 2 | 3 | 4,
-        updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : '',
-        url: typeof r.url === 'string' ? r.url : '',
-        summary: typeof r.summary === 'string' ? r.summary : '',
-      } satisfies Advisory;
+        iso2: getStr(r.iso2),
+        country: getStr(r.country),
+        level,
+        updatedAt: getStr(r.updatedAt) ?? getStr(r.updated),
+        url: getStr(r.url),
+        summary: getStr(r.summary),
+      };
     });
-  } catch {
+  } catch (err) {
+    console.error('[countries] advisories fetch failed', err);
     advisories = [];
   }
 
   console.log('[countries] fetched advisories:', advisories.length);
+  const missingIso2 = advisories.filter(a => !a.iso2 || a.iso2.length !== 2).length;
+  if (missingIso2) {
+    console.warn('[countries] advisories missing iso2:', missingIso2);
+  }
 
+  // Resolve to ISO-3166-1 alpha-2. We prefer upstream iso2, but fall back to a strict
+  // name→ISO2 map when iso2 is missing. This recovers many entries while avoiding
+  // fuzzy/ambiguous matches.
   function resolveIso2(a: Advisory): string | null {
-    if (a.iso2 && a.iso2.length === 2) return a.iso2.toUpperCase();
-    const byName = nameToIso2(a.country);
-    return byName ? byName.toUpperCase() : null;
+    // Prefer explicit ISO2 from upstream; otherwise try exact and normalized name maps.
+    const fromIso = a.iso2 && /^[A-Za-z]{2}$/.test(a.iso2) ? a.iso2.toUpperCase() : null;
+    if (fromIso) return fromIso;
+
+    // 1) Exact mapping helper (strict typed map)
+    if (typeof a.country === 'string' && a.country.trim()) {
+      const exact = nameToIso2(a.country.trim());
+      if (exact && exact.length === 2) return exact.toUpperCase();
+
+      // 2) Normalized name/alias index built from COUNTRY_SEEDS
+      const key = normalizeName(a.country);
+      const byAlias = NAME_INDEX.get(key);
+      if (byAlias) return byAlias.toUpperCase();
+    }
+    return null;
   }
 
   // Map iso2 -> advisory (resolve iso2 from name when missing)
@@ -215,6 +279,16 @@ export async function GET() {
     if (key) overlay.set(key, a);
   }
   console.log('[countries] overlay size:', overlay.size);
+  if (overlay.size !== advisories.length) {
+    console.warn('[countries] overlay size != advisories length', { overlay: overlay.size, advisories: advisories.length });
+  }
+  if (overlay.size !== advisories.length) {
+    const missing = advisories
+      .filter(a => !resolveIso2(a))
+      .slice(0, 5)
+      .map(a => ({ country: a.country, iso2: a.iso2 }));
+    console.warn('[countries] unmapped advisories (sample up to 5):', missing);
+  }
 
   // Merge overlay onto seeds, keep every seed (full coverage)
   const merged: CountryOut[] = COUNTRY_SEEDS.map((seed) => {
@@ -224,8 +298,8 @@ export async function GET() {
       advisory: adv
         ? {
             level: adv.level,
-            updatedAt: adv.updatedAt,
-            url: adv.url,
+            updatedAt: adv.updatedAt || '',
+            url: adv.url || '',
             summary: adv.summary ?? '',
           }
         : null,
@@ -247,8 +321,8 @@ export async function GET() {
         territory: true,
         advisory: {
           level: a.level,
-          updatedAt: a.updatedAt,
-          url: a.url,
+          updatedAt: a.updatedAt || '',
+          url: a.url || '',
           summary: a.summary ?? '',
         },
       } as CountryOut;
@@ -280,7 +354,6 @@ export async function GET() {
 
     // Optionally enrich facts with macro signals for affordability + themes
     // These files are optional; if missing we proceed without them.
-    type IsoMap = Record<string, number | string | string[] | undefined>;
 
     const [gdpJson, fxJson, colJson, themesJson] = await Promise.all([
       safeJsonImport<Record<string, number>>("@/data/sources/gdp_per_capita.json"),
@@ -406,6 +479,11 @@ export async function GET() {
         const total = totalScoreFromFacts(row.facts as Partial<CountryFacts>);
         (row.facts as unknown as FactsExtraServer).scoreTotal = total;
       } catch {}
+    }
+    if (merged.length) {
+      const s = merged[0];
+      const sampleVisaEase = (s.facts ? (s.facts as FactsExtraServer).visaEase : undefined);
+      console.log('[countries] sample', s.iso2, s.advisory?.level, sampleVisaEase);
     }
     console.log('[countries] attached live GDP+FX data');
   } catch (e) {

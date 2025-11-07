@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "tsx": "^4.20.6"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.3.1"
   }
 }

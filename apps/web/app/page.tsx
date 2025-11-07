@@ -88,7 +88,7 @@ export default function Home() {
             return (
               <Link
                 key={c.iso2}
-                href={`/country/${c.iso2.toUpperCase()}`}
+                href={`/country/${c.iso2.toLowerCase()}`}
                 className="relative block paper p-4 hover:-translate-y-0.5 transition-transform"
               >
                 <span className="tape right" />
