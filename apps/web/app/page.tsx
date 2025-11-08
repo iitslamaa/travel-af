@@ -59,67 +59,64 @@ export default function Home() {
   };
 
   return (
-    <main className="scribble mx-auto max-w-5xl p-6">
-      <h1 className="text-3xl font-bold">TRAVEL APP AF</h1>
-      <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+    <>
+      <h1 className="h1 mt-1 mb-5">TravelScorer</h1>
+      <p className="muted mb-6">
         Canonical UN/ISO countries & territories with live travel.state.gov advisory overlay.
       </p>
 
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-4">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search countries or codes (e.g., JP, JPN, 'Korea')"
-          className="w-full max-w-md rounded border px-3 py-2 bg-white dark:bg-zinc-900"
+          className="w-full rounded border px-3 py-2 bg-white dark:bg-zinc-900"
         />
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="text-sm muted sm:ml-3 self-end sm:self-auto mt-1 sm:mt-0">
           {filtered.length} countries
         </span>
       </div>
 
       {loading ? (
-        <div className="text-zinc-600 dark:text-zinc-400">Loading…</div>
+        <div className="muted">Loading…</div>
       ) : error ? (
         <div className="text-red-600">{error}</div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid-cards">
           {filtered.map((c) => {
             const s = scoreFor(c);
             return (
               <Link
                 key={c.iso2}
                 href={`/country/${c.iso2.toLowerCase()}`}
-                className="relative block paper p-4 hover:-translate-y-0.5 transition-transform"
+                className="card p-3 sm:p-4 block hover:-translate-y-0.5 transition-transform"
               >
-                <span className="tape right" />
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <Image
                       src={`https://flagcdn.com/w40/${c.iso2.toLowerCase()}.png`}
                       alt={`${c.name} flag`}
-                      width={28}
-                      height={20}
+                      width={24}
+                      height={16}
                       className="rounded shadow-sm ring-1 ring-black/10 dark:ring-white/10 bg-white"
                       unoptimized
                     />
                     <div>
-                      <div className="text-lg font-semibold">{c.name}</div>
-                      <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                      <div className="h2">{c.name}</div>
+                      <div className="text-sm muted">
                         {c.region || '—'} {c.subregion ? `• ${c.subregion}` : ''}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-sm text-zinc-500">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 order-2 sm:order-none">
+                    <div className="hidden sm:block text-sm muted text-right">
                       <div>{c.iso2} / {c.iso3}</div>
                       <div>M49: {c.m49 || '—'}</div>
                     </div>
                     {typeof s === 'number' && (
                       <span
                         title="Travelability score"
-                        className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-full border px-2 text-sm font-semibold ${
-                          s >= 80 ? 'bg-green-100 text-green-800 border-green-300' : s >= 60 ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-red-100 text-red-800 border-red-300'
-                        }`}
+                        className={`pill ${s >= 80 ? 'pill--good' : s >= 60 ? 'pill--warn' : 'pill--bad'}`}
                       >
                         {s}
                       </span>
@@ -144,21 +141,21 @@ export default function Home() {
                       >
                         travel.state.gov
                       </button>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs muted hidden sm:block">
                         Updated {new Date(c.advisory.updatedAt).toLocaleDateString()}
                       </div>
                       {c.advisory.summary && (
-                        <div className="text-xs mt-1 text-zinc-600 dark:text-zinc-400 line-clamp-3">
+                        <div className="hidden sm:block text-xs mt-1 muted line-clamp-3 max-w-prose">
                           {c.advisory.summary}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-sm text-zinc-500">No advisory found.</div>
+                    <div className="text-sm muted">No advisory found.</div>
                   )}
                 </div>
-                <div className="mt-3 text-sm">
-                  <span className="text-zinc-500">Details: </span>
+                <div className="mt-3 text-sm hidden sm:block">
+                  <span className="muted">Details: </span>
                   <span className="text-blue-600 underline">Open country page →</span>
                 </div>
               </Link>
@@ -166,6 +163,6 @@ export default function Home() {
           })}
         </div>
       )}
-    </main>
+    </>
   );
 }
