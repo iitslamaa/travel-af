@@ -28,7 +28,7 @@ function renderFactorBreakdown(rows: FactRow[], key: FactRow['key']) {
   const n = factorNumbersFromRows(rows, key);
   if (!n) return null;
   return (
-    <div className="mt-3 text-xs text-zinc-600 dark:text-zinc-400 grid grid-cols-3 gap-3">
+    <div className="mt-3 text-xs muted grid grid-cols-3 gap-3">
       <div><span className="font-medium">Normalized:</span> {n.normalized ?? '—'}</div>
       <div><span className="font-medium">Weight:</span> {n.weightPct}%</div>
       <div><span className="font-medium">Contribution:</span> {n.contribution ?? '—'}</div>
@@ -488,14 +488,13 @@ export default async function CountryPage({ params }: PageProps) {
   const daily = pickDailySpend(fxFacts);
 
   return (
-    <div className="scribble max-w-4xl mx-auto px-6 py-8">
+    <>
       <div className="mb-6">
         <Link href="/" className="text-sm text-blue-600 hover:underline">← Back</Link>
       </div>
 
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center gap-3 mt-1 mb-4">
         <div className="relative">
-          <span className="tape left" />
           <Image
             src={flagPng}
             alt={`${row.name ?? iso2} flag`}
@@ -505,61 +504,63 @@ export default async function CountryPage({ params }: PageProps) {
             unoptimized
           />
         </div>
-        <h1 className="text-3xl font-semibold">{row.name ?? iso2}</h1>
+        <h1 className="h1">{row.name ?? iso2}</h1>
       </div>
-      <p className="text-sm text-zinc-500 mb-6 tracking-wide">
+      <p className="text-sm muted mb-8 tracking-wide">
         {iso2} • M49: {row.m49 ?? '—'}
         {row.region ? ` • ${row.region}` : ''}{row.subregion ? ` • ${row.subregion}` : ''}
       </p>
 
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
-        <div className="md:col-span-2 paper paper--lined paper--tilt-sm p-5">
-          <div className="flex items-baseline justify-between mb-2">
-            <h2 className="font-medium">Overall Travelability Score</h2>
-            <div className="text-3xl font-bold">{displayTotal}</div>
-          </div>
-          <p className="text-sm text-zinc-600">
-            Weighted by your current formula. Missing signals are ignored and the remaining weights are re-normalized.
-          </p>
-        </div>
-
-        <div className="paper paper--grid p-5 relative overflow-hidden">
-          <h3 className="font-medium mb-2">Advisory</h3>
-          <span className="tape right absolute top-2 right-2 z-10 pointer-events-none" />
-          {row.advisory ? (
-            <div className="text-sm space-y-2">
-              <div className="flex items-center gap-2">
-                <AdvisoryBadge level={row.advisory.level as 1|2|3|4|undefined} />
-              </div>
-              <p className="mt-1 text-xs italic text-zinc-600">
-                {explainAdvisory(row.name ?? iso2, row.advisory.level as 1|2|3|4|undefined, row.advisory.updatedAt)}
-              </p>
-              {row.advisory.summary && (
-                <p className="mt-1 text-xs italic text-zinc-500 line-clamp-3 break-words max-w-full">
-                  {(row.advisory.summary as string).replace(/<[^>]+>/g, '')}
-                </p>
-              )}
-              {row.advisory.url ? (
-                <a
-                  className="text-blue-600 hover:underline inline-block"
-                  href={row.advisory.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  travel.state.gov
-                </a>
-              ) : null}
+      <div className="lg:grid lg:grid-cols-12 lg:gap-6 mb-8">
+        <div className="lg:col-span-8 space-y-4">
+          <div className="card p-5">
+            <div className="flex items-baseline justify-between mb-2">
+              <h2 className="font-medium">Overall Travelability Score</h2>
+              <div className="text-3xl font-bold">{displayTotal}</div>
             </div>
-          ) : (
-            <div className="text-sm text-zinc-500">No advisory found.</div>
-          )}
+            <p className="text-sm muted">
+              Weighted by your current formula. Missing signals are ignored and the remaining weights are re-normalized.
+            </p>
+          </div>
         </div>
+        <aside className="hidden lg:block lg:col-span-4 lg:self-start lg:sticky lg:top-24">
+          <div className="card p-5">
+            <div className="text-sm font-semibold mb-2 tracking-wider uppercase">Advisory</div>
+            {row.advisory ? (
+              <div className="text-sm space-y-2">
+                <div className="flex items-center gap-2">
+                  <AdvisoryBadge level={row.advisory.level as 1|2|3|4|undefined} />
+                </div>
+                <p className="mt-1 text-xs italic muted">
+                  {explainAdvisory(row.name ?? iso2, row.advisory.level as 1|2|3|4|undefined, row.advisory.updatedAt)}
+                </p>
+                {row.advisory.summary && (
+                  <p className="mt-1 text-xs italic muted line-clamp-3 break-words max-w-full">
+                    {(row.advisory.summary as string).replace(/<[^>]+>/g, '')}
+                  </p>
+                )}
+                {row.advisory.url ? (
+                  <a
+                    className="text-blue-600 hover:underline inline-block"
+                    href={row.advisory.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    travel.state.gov
+                  </a>
+                ) : null}
+              </div>
+            ) : (
+              <div className="text-sm muted">No advisory found.</div>
+            )}
+          </div>
+        </aside>
       </div>
 
-      <div className="paper paper--lined p-5 mb-8 overflow-x-auto">
+      <div className="card p-5 mb-8 overflow-x-auto">
         <h3 className="font-medium mb-3">Score Breakdown</h3>
         <table className="w-full text-sm">
-          <thead className="text-zinc-500">
+          <thead className="muted">
             <tr>
               <th className="text-left p-2">Factor</th>
               <th className="text-right p-2">Raw</th>
@@ -594,7 +595,7 @@ export default async function CountryPage({ params }: PageProps) {
       <section className="mt-10">
         <div className="flex gap-6">
           {/* Sticky nav */}
-          <nav className="hidden md:block w-60 shrink-0 sticky top-24 self-start index-card index-card__ruled p-3">
+          <nav className="hidden md:block w-60 shrink-0 sticky top-24 self-start card p-3">
             <div className="text-sm font-semibold mb-2 tracking-wider uppercase">Deep Dive</div>
             <ul className="space-y-2 text-sm">
               <li><a className="hover:underline" href="#overview">Overview</a></li>
@@ -613,17 +614,16 @@ export default async function CountryPage({ params }: PageProps) {
           {/* Content column */}
           <div className="grow space-y-8">
             {/* Overview */}
-            <section id="overview" className="scroll-mt-24 paper p-4">
+            <section id="overview" className="scroll-mt-24 card p-4">
               <h3 className="text-lg font-semibold mb-2">Why this score?</h3>
-              <span className="tape left" />
-              <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{explain(facts, rows)}</p>
+              <p className="text-sm leading-6">{explain(facts, rows)}</p>
             </section>
 
             {/* Advisory */}
-            <section id="advisory" className="scroll-mt-24 paper p-4">
+            <section id="advisory" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 <h4 className="font-medium">Travel.gov advisory</h4>
-                <div className="text-sm text-zinc-500">
+                <div className="text-sm muted">
                   Raw: {Math.round(advisoryToScore(row.advisory?.level as 1|2|3|4|undefined)) ?? '—'}
                 </div>
               </header>
@@ -637,18 +637,18 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* TravelSafe */}
-            <section id="travelsafe" className="scroll-mt-24 paper p-4">
+            <section id="travelsafe" className="scroll-mt-24 card p-4">
               <h4 className="sr-only">TravelSafe Abroad</h4>
               <TravelSafeSection raw={rows.find(r=>r.key==='travelSafe')?.raw} />
               {renderFactorBreakdown(rows, 'travelSafe')}
             </section>
 
             {/* Solo Female */}
-            <section id="solofemale" className="scroll-mt-24 paper p-4">
+            <section id="solofemale" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 {/* Hide duplicate title; keep metrics on the right */}
                 <h4 className="font-medium sr-only">Solo Female Travelers</h4>
-                <div className="text-sm text-zinc-500">
+                <div className="text-sm muted">
                   Raw: {rows.find(r=>r.key==='sfti')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='sfti')?.weight ?? 0)*100)}%
                 </div>
               </header>
@@ -660,16 +660,15 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* Reddit */}
-            <section id="reddit" className="scroll-mt-24 paper p-4">
+            <section id="reddit" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 <h4 className="font-medium">Reddit sentiment</h4>
-                <div className="text-sm text-zinc-500">Raw: {rows.find(r=>r.key==='reddit')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='reddit')?.weight ?? 0)*100)}%</div>
+                <div className="text-sm muted">Raw: {rows.find(r=>r.key==='reddit')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='reddit')?.weight ?? 0)*100)}%</div>
               </header>
               <div className="mt-2 flex items-center gap-2">
                 <ScorePill value={typeof rows.find(r=>r.key==='reddit')?.raw === 'number' ? Math.round(rows.find(r=>r.key==='reddit')!.raw as number) : undefined} />
                 <span className="text-sm font-semibold">🧵 Reddit</span>
               </div>
-              <span className="tape right" />
               <p className="mt-2 text-sm leading-6">{explainReddit((facts as FactsExtra)?.redditThemes, (facts as FactsExtra)?.redditSummary)}</p>
               {renderFactorBreakdown(rows, 'reddit')}
               {(facts as FactsExtra)?.redditSummary && (
@@ -685,11 +684,11 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* Seasonality */}
-            <section id="seasonality" className="scroll-mt-24 paper p-4">
+            <section id="seasonality" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 {/* Hide duplicate title; keep metrics on the right */}
                 <h4 className="font-medium sr-only">Seasonality (now)</h4>
-                <div className="text-sm text-zinc-500">
+                <div className="text-sm muted">
                   Raw: {rows.find(r=>r.key==='seasonality')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='seasonality')?.weight ?? 0)*100)}%
                 </div>
               </header>
@@ -710,23 +709,18 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* Visa */}
-            <section id="visa" className="scroll-mt-24 paper p-4">
+            <section id="visa" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 <h4 className="font-medium">Visa ease (US passport)</h4>
-                <div className="text-sm text-zinc-500">Raw: {rows.find(r=>r.key==='visa')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='visa')?.weight ?? 0)*100)}%</div>
+                <div className="text-sm muted">Raw: {rows.find(r=>r.key==='visa')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='visa')?.weight ?? 0)*100)}%</div>
               </header>
               {(() => {
                 const raw = rows.find(r=>r.key==='visa')?.raw;
                 const easeNum = typeof raw === 'number' ? Math.round(raw) : undefined;
                 return (
                   <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className={`inline-flex h-7 min-w-[2.25rem] items-center justify-center rounded-full border px-2 text-sm font-semibold ${scoreBadgeClass(easeNum)}`}
-                      title="Visa ease score"
-                    >
-                      {easeNum ?? '—'}
-                    </span>
-                    <span className="text-zinc-300" aria-hidden="true">|</span>
+                    <span className="pill" title="Visa ease score">{easeNum ?? '—'}</span>
+                    <span className="muted" aria-hidden="true">|</span>
                     <VisaBadge
                       visaType={(facts as FactsExtra)?.visaType}
                       ease={easeNum}
@@ -751,16 +745,15 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* Affordability */}
-            <section id="affordability" className="scroll-mt-24 paper p-4">
+            <section id="affordability" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 <h4 className="font-medium">Affordability</h4>
-                <div className="text-sm text-zinc-500">Raw: {rows.find(r=>r.key==='affordability')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='affordability')?.weight ?? 0)*100)}%</div>
+                <div className="text-sm muted">Raw: {rows.find(r=>r.key==='affordability')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='affordability')?.weight ?? 0)*100)}%</div>
               </header>
               <div className="mt-2 flex items-center gap-2">
                 <ScorePill value={typeof rows.find(r=>r.key==='affordability')?.raw === 'number' ? Math.round(rows.find(r=>r.key==='affordability')!.raw as number) : undefined} />
                 <span className="text-sm font-semibold">💵 Costs</span>
               </div>
-              <span className="tape right" />
               <p className="mt-2 text-sm leading-6">{explainAffordability(facts as Partial<FactsExtra>)}</p>
               {renderFactorBreakdown(rows, 'affordability')}
               {(() => {
@@ -777,10 +770,10 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* Flight */}
-            <section id="flight" className="scroll-mt-24 paper p-4">
+            <section id="flight" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 <h4 className="font-medium">Direct flight</h4>
-                <div className="text-sm text-zinc-500">Raw: {rows.find(r=>r.key==='directFlight')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='directFlight')?.weight ?? 0)*100)}%</div>
+                <div className="text-sm muted">Raw: {rows.find(r=>r.key==='directFlight')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='directFlight')?.weight ?? 0)*100)}%</div>
               </header>
               <div className="mt-2 flex items-center gap-2">
                 <ScorePill value={typeof rows.find(r=>r.key==='directFlight')?.raw === 'number' ? Math.round(rows.find(r=>r.key==='directFlight')!.raw as number) : undefined} />
@@ -791,10 +784,10 @@ export default async function CountryPage({ params }: PageProps) {
             </section>
 
             {/* Infrastructure */}
-            <section id="infrastructure" className="scroll-mt-24 paper p-4">
+            <section id="infrastructure" className="scroll-mt-24 card p-4">
               <header className="flex items-baseline justify-between">
                 <h4 className="font-medium">Tourist infrastructure</h4>
-                <div className="text-sm text-zinc-500">Raw: {rows.find(r=>r.key==='infrastructure')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='infrastructure')?.weight ?? 0)*100)}%</div>
+                <div className="text-sm muted">Raw: {rows.find(r=>r.key==='infrastructure')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='infrastructure')?.weight ?? 0)*100)}%</div>
               </header>
               <div className="mt-2 flex items-center gap-2">
                 <ScorePill value={typeof rows.find(r=>r.key==='infrastructure')?.raw === 'number' ? Math.round(rows.find(r=>r.key==='infrastructure')!.raw as number) : undefined} />
@@ -806,6 +799,6 @@ export default async function CountryPage({ params }: PageProps) {
           </div>
         </div>
       </section>
-    </div>
+    </>
   );
 }
