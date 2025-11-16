@@ -160,6 +160,18 @@ type CountryRowLite = {
   facts?: CountryFacts;
 };
 
+type CountriesLiteResponse = {
+  countries: CountryRowLite[];
+};
+
+function isCountriesLiteResponse(json: unknown): json is CountriesLiteResponse {
+  return (
+    typeof json === 'object' &&
+    json !== null &&
+    Array.isArray((json as CountriesLiteResponse).countries)
+  );
+}
+
 // Your final weights from earlier (sum = 1.0)
 const W = {
   travelGov: 0.30,
@@ -466,7 +478,14 @@ export default async function CountryPage({ params }: PageProps) {
   try {
     const res = await fetch(apiUrl, { cache: 'no-store' });
     if (res.ok) {
-      all = await res.json();
+      const json: CountriesLiteResponse | CountryRowLite[] | unknown = await res.json();
+      if (Array.isArray(json)) {
+        all = json as CountryRowLite[];
+      } else if (isCountriesLiteResponse(json)) {
+        all = json.countries;
+      } else {
+        all = [];
+      }
     }
   } catch (_) {
     // fall through to notFound below
@@ -715,16 +734,18 @@ export default async function CountryPage({ params }: PageProps) {
                 <div className="text-sm muted">Raw: {rows.find(r=>r.key==='visa')?.raw ?? '—'} · Weight: {Math.round((rows.find(r=>r.key==='visa')?.weight ?? 0)*100)}%</div>
               </header>
               {(() => {
-                const raw = rows.find(r=>r.key==='visa')?.raw;
+                const raw = rows.find(r => r.key === 'visa')?.raw;
                 const easeNum = typeof raw === 'number' ? Math.round(raw) : undefined;
                 return (
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="pill" title="Visa ease score">{easeNum ?? '—'}</span>
+                    <ScorePill value={easeNum} />
                     <span className="muted" aria-hidden="true">|</span>
                     <VisaBadge
                       visaType={(facts as FactsExtra)?.visaType}
                       ease={easeNum}
-                      feeUsd={typeof (facts as FactsExtra)?.visaFeeUsd === 'number' ? Number((facts as FactsExtra).visaFeeUsd) : undefined}
+                      feeUsd={typeof (facts as FactsExtra)?.visaFeeUsd === 'number'
+                        ? Number((facts as FactsExtra).visaFeeUsd)
+                        : undefined}
                     />
                   </div>
                 );
