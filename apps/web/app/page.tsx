@@ -24,6 +24,16 @@ type CountriesResponse = {
   countries: CountryRow[];
 };
 
+type CountriesResult = CountriesResponse | CountryRow[];
+
+function isCountriesResponse(json: unknown): json is CountriesResponse {
+  return (
+    typeof json === 'object' &&
+    json !== null &&
+    Array.isArray((json as CountriesResponse).countries)
+  );
+}
+
 export default function Home() {
   const [data, setData] = useState<CountryRow[]>([]);
   const [q, setQ] = useState('');
@@ -38,8 +48,18 @@ export default function Home() {
         setLoading(true);
         const res = await fetch('/api/countries', { cache: 'no-store' });
         if (!res.ok) throw new Error('Failed to load countries');
-        const json = (await res.json()) as CountriesResponse;
-        const rows = Array.isArray(json.countries) ? json.countries : [];
+
+        const json: CountriesResult | unknown = await res.json();
+        let rows: CountryRow[] = [];
+
+        if (Array.isArray(json)) {
+          // Old shape: API returns an array directly
+          rows = json as CountryRow[];
+        } else if (isCountriesResponse(json)) {
+          // New shape: { countries: [...] }
+          rows = json.countries;
+        }
+
         if (alive) {
           setData(rows);
           setError(null);
@@ -50,7 +70,9 @@ export default function Home() {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const scoreFor = (c: CountryRow) => {
