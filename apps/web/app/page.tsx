@@ -6,11 +6,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 // Shape returned by /api/countries (seed + advisory overlay)
+
 type CountryRow = {
   iso2: string;
   iso3: string;
   m49: number;
   name: string;
+  score?: number;
   region?: string;
   subregion?: string;
   aliases?: string[];
@@ -18,11 +20,16 @@ type CountryRow = {
   facts?: (Partial<CountryFacts> & { scoreTotal?: number }) | undefined;
 };
 
+type CountriesResponse = {
+  countries: CountryRow[];
+};
+
 export default function Home() {
   const [data, setData] = useState<CountryRow[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc'); // default: high → low
 
   useEffect(() => {
     let alive = true;
@@ -31,8 +38,12 @@ export default function Home() {
         setLoading(true);
         const res = await fetch('/api/countries', { cache: 'no-store' });
         if (!res.ok) throw new Error('Failed to load countries');
-        const rows: CountryRow[] = (await res.json()) as CountryRow[];
-        if (alive) { setData(rows); setError(null); }
+        const json = (await res.json()) as CountriesResponse;
+        const rows = Array.isArray(json.countries) ? json.countries : [];
+        if (alive) {
+          setData(rows);
+          setError(null);
+        }
       } catch (e: unknown) {
         if (alive) setError(e instanceof Error ? e.message : 'Failed to load');
       } finally {
@@ -42,21 +53,45 @@ export default function Home() {
     return () => { alive = false; };
   }, []);
 
-  const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    if (!qq) return data;
-    return data.filter(c =>
-      c.name.toLowerCase().includes(qq) ||
-      (c.aliases ?? []).some(a => a.toLowerCase().includes(qq)) ||
-      c.iso2.toLowerCase() === qq ||
-      c.iso3.toLowerCase() === qq
-    );
-  }, [data, q]);
-
   const scoreFor = (c: CountryRow) => {
-    const total = c.facts?.scoreTotal;
-    return typeof total === 'number' && Number.isFinite(total) ? total : undefined;
+    const raw =
+      c.score ??
+      (typeof c.facts?.scoreTotal === 'number' ? c.facts!.scoreTotal : c.facts?.scoreTotal);
+    const num = typeof raw === 'string' ? Number(raw) : raw;
+    return typeof num === 'number' && Number.isFinite(num) ? num : undefined;
   };
+
+  const filtered = useMemo(() => {
+    if (!data) return [];
+
+    const term = q.trim().toLowerCase();
+
+    const base = data.filter((row) => {
+      if (!term) return true;
+
+      const haystack = [
+        row.name,
+        row.iso2,
+        row.iso3,
+        row.m49?.toString(),
+        ...(row.aliases ?? []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(term);
+    });
+
+    // Sort by score, using the same logic as Swift
+    const sorted = [...base].sort((a, b) => {
+      const sa = scoreFor(a) ?? 0;
+      const sb = scoreFor(b) ?? 0;
+      return sortOrder === 'asc' ? sa - sb : sb - sa;
+    });
+
+    return sorted;
+  }, [data, q, sortOrder]);
 
   return (
     <>
@@ -69,12 +104,21 @@ export default function Home() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search countries or codes (e.g., JP, JPN, 'Korea')"
+          placeholder="Search destinations by country or code (e.g., JP, JPN, 'Korea')"
           className="w-full rounded border px-3 py-2 bg-white dark:bg-zinc-900"
         />
-        <span className="text-sm muted sm:ml-3 self-end sm:self-auto mt-1 sm:mt-0">
-          {filtered.length} countries
-        </span>
+        <div className="flex items-center gap-2 sm:ml-3 self-end sm:self-auto mt-1 sm:mt-0">
+          <button
+            type="button"
+            className="text-xs px-2 py-1 rounded border border-zinc-300 bg-white hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-700"
+            onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+          >
+            Sort by score: {sortOrder === 'asc' ? '↑ low → high' : '↓ high → low'}
+          </button>
+          <span className="text-sm muted">
+            {filtered.length} countries
+          </span>
+        </div>
       </div>
 
       {loading ? (

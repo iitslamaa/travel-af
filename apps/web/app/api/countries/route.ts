@@ -11,13 +11,17 @@ import { fxLocalPerUSDMapByIso2 } from '@/lib/providers/fx';
 import { fmGroupByCountry, fmByIso2 } from '@/lib/providers/frequentmiler';
 import { buildVisaIndex } from '@/lib/providers/visa';
 import { estimateDailySpendHotel } from '@/lib/providers/costs';
+
 import type { DailySpend } from '@/lib/providers/costs';
+import { buildTravelSafeIndex, type TravelSafeEntry } from '@/lib/providers/travelsafe';
 
 
 // Local type to avoid any
 type FactsExtraServer = Partial<CountryFacts> & {
   advisoryLevel?: 1 | 2 | 3 | 4;
   travelSafeOverall?: number;
+  travelSafeUrl?: string;
+  travelSafeSummary?: string;
   soloFemaleIndex?: number;
   redditComposite?: number;
   seasonality?: number;
@@ -362,6 +366,17 @@ export async function GET() {
       safeJsonImport<Record<string, string[]>>("@/data/sources/reddit_themes.json"),
     ]);
 
+    // Optionally load TravelSafe Abroad index (robust to absence)
+    const travelSafeIndex: Map<string, TravelSafeEntry> =
+      await (async (): Promise<Map<string, TravelSafeEntry>> => {
+        try {
+          const idx = await buildTravelSafeIndex();
+          return idx ?? new Map<string, TravelSafeEntry>();
+        } catch {
+          return new Map<string, TravelSafeEntry>();
+        }
+      })();
+
     // Normalize keys to ISO2 uppercase where possible
     function toIso2Key(k: string): string { return k?.toUpperCase?.() ?? k; }
     const gdpMap: Record<string, number> = Object.fromEntries(
@@ -452,6 +467,18 @@ export async function GET() {
         }
       } catch {}
 
+      // --- Attach TravelSafe Abroad website overall & metadata (optional)
+      try {
+        const ts = travelSafeIndex.get(keyUpper);
+        if (ts) {
+          const fxs = row.facts as unknown as FactsExtraServer;
+          const overall = Number(ts.overall);
+          if (Number.isFinite(overall)) fxs.travelSafeOverall = Math.round(overall);
+          if (typeof ts.url === 'string') fxs.travelSafeUrl = ts.url;
+          if (typeof ts.summary === 'string') fxs.travelSafeSummary = ts.summary;
+        }
+      } catch {}
+
       // --- Attach Frequent Miler seasonality (best months & today verdict)
       try {
         const fmAreas = fmIsoMap.get(keyUpper) || [];
@@ -493,5 +520,42 @@ export async function GET() {
   // Sort alphabetically by name
   merged.sort((x, y) => x.name.localeCompare(y.name));
 
-  return NextResponse.json(merged);
+  // Project to a stable DTO the clients can rely on
+  type CountryDTOOut = {
+    iso2: string;
+    name: string;
+    score: number | null; // canonical total score, or null if missing
+    visa: number | null;  // 0..100 visa ease, or null if missing
+    advisory: { levelNumber: 1 | 2 | 3 | 4 | null; levelText: string | null };
+    seasonality: {
+      bestMonths: number[]; // 1..12 (can be empty)
+      todayScore: number | null; // 0..100 or null
+      todayLabel: 'best' | 'good' | 'shoulder' | 'poor' | null;
+      source: string | null;
+    };
+  };
+
+  const countries: CountryDTOOut[] = merged.map((row) => {
+    const fx = (row.facts ?? {}) as FactsExtraServer;
+    const level = row.advisory?.level ?? null;
+
+    return {
+      iso2: row.iso2.toUpperCase(),
+      name: row.name,
+      score: typeof fx.scoreTotal === 'number' ? fx.scoreTotal : null,
+      visa: typeof fx.visaEase === 'number' ? fx.visaEase : null,
+      advisory: {
+        levelNumber: (level === 1 || level === 2 || level === 3 || level === 4) ? level : null,
+        levelText: (level === 1 || level === 2 || level === 3 || level === 4) ? `Level ${level}` : null,
+      },
+      seasonality: {
+        bestMonths: Array.isArray(fx.fmSeasonalityBestMonths) ? fx.fmSeasonalityBestMonths : [],
+        todayScore: typeof fx.fmSeasonalityTodayScore === 'number' ? fx.fmSeasonalityTodayScore : null,
+        todayLabel: fx.fmSeasonalityTodayLabel ?? null,
+        source: fx.fmSeasonalitySource ?? null,
+      },
+    };
+  });
+
+  return NextResponse.json({ countries });
 }

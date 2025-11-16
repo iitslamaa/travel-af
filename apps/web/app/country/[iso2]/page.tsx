@@ -466,7 +466,8 @@ export default async function CountryPage({ params }: PageProps) {
   try {
     const res = await fetch(apiUrl, { cache: 'no-store' });
     if (res.ok) {
-      all = await res.json();
+      const json = (await res.json()) as { countries?: CountryRowLite[] };
+      all = Array.isArray(json.countries) ? json.countries : [];
     }
   } catch (_) {
     // fall through to notFound below
